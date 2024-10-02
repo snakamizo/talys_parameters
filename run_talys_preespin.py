@@ -29,7 +29,17 @@ def clean_data_file(input_file, cleaned_file):
 
 def search_for_specific_output_file(directory, product_six_digit_code):
     """Search for the rp*.tot file that contains the six-digit code in the filename."""
-    pattern = os.path.join(directory, f"rp*{product_six_digit_code}*.tot")
+    # Check if the last character of the six-digit code is a letter
+    last_char = product_six_digit_code[-1]
+
+    # Set the pattern based on the letter (if present)
+    if last_char == 'm':
+        pattern = os.path.join(directory, f"rp*{product_six_digit_code[:-1]}*.L02")
+    elif last_char == 'g':
+        pattern = os.path.join(directory, f"rp*{product_six_digit_code[:-1]}*.L00")
+    else:
+        pattern = os.path.join(directory, f"rp*{product_six_digit_code}*.tot")  # Default case
+
     matched_files = glob.glob(pattern)
     return matched_files[0] if matched_files else None
 
@@ -62,8 +72,6 @@ set title 'Cross Section Plot for TALYS and External Data'
 set xlabel 'Energy (MeV)'
 set ylabel 'Cross Section (mb)'
 set grid
-
-set xrange [0:30]
 
 plot """
     
@@ -147,7 +155,7 @@ def main():
         # Step 1: Search for the "rp*.tot" file that contains the six-digit code
         data_file = search_for_specific_output_file(new_directory, product_six_digit_code)
         if not data_file:
-            print(f"No 'rp*.tot' files found for preeqspin {constant}.")
+            print(f"No 'rp*' files found for preeqspin {constant}.")
             continue
 
 
