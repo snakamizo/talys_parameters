@@ -1,0 +1,7 @@
+[
+    {"projectile": "p", "element": "c", "mass": 13, "energy": "1. 40. 0.5"},
+    {"projectile": "p", "element": "o", "mass": 18, "energy": "1. 40. 0.5"},
+    {"projectile": "p", "element": "ga", "mass": 69, "energy": "1. 40. 0.5"},
+    {"projectile": "p", "element": "y", "mass": 89, "energy": "1. 40. 0.5"},
+    {"projectile": "p", "element": "te", "mass": 124, "energy": "1. 40. 0.5"}
+]
