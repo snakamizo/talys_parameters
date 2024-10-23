@@ -79,7 +79,7 @@ def main():
     print(f"File '{output_file}' created successfully!")
 
     # Run the bash script with the output file as an argument
-    bash_script = os.path.expanduser("~/Documents/run_talys.sh")
+    bash_script = os.path.expanduser("./run_talys.sh")
     subprocess.run([bash_script, output_file])
 
     # Step 1: Search for the "rp*.tot" file that contains the six-digit code
