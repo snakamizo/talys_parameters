@@ -24,18 +24,15 @@ from script.plotting import (
     generate_combined_gnuplot_script,
     run_gnuplot,
     generate_chi_squared_gnuplot_script,
-    generate_average_chi_squared_gnuplot_script,
     generate_total_average_chi_squared_gnuplot_script,
     generate_mass_chi_squared_gnuplot_script,
     generate_ratio_gnuplot_script,
 )
-from script.utils import (
+from script.utilities import (
     split_by_number,
     clean_data_file,
-    genenerate_six_digit_code,
     setup_logging,
     generate_six_digit_code_from_product_info,
-    elemtoz,
 )
 from script.talys_modules import (
     create_talys_inp,
@@ -54,7 +51,6 @@ from script.latex import (
     end_latex_document,
     add_totalchi_to_latex_document,
     add_masschi_to_latex_document,
-    add_table_to_latex_document,
     add_ratio_to_latex_document,
 )
 
@@ -143,6 +139,7 @@ def process(
     chi2_values_list,
 ):
     logging.info(input)
+
     projectile = input["projectile"]
     element = input["element"]
     mass = int(input["mass"])
@@ -414,7 +411,7 @@ def main():
         run_gnuplot(gnuplot_script5, gnuplot_script_file5)
         add_masschi_to_latex_document(gnuplot_output_directory, j)
 
-    for ratio_idx, column_idx in enumerate([1, 3, 4, 5], start=1):
+    for _, column_idx in enumerate([1, 3, 4, 5], start=1):
         ratio_plot_file = os.path.join(
             gnuplot_output_directory, f"ratio_vs_mass_col{column_idx}.png"
         )

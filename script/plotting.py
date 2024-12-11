@@ -4,10 +4,10 @@ import colorsys
 import re
 import glob
 import logging
-from utils import clean_data_file
-from talys_modules import extract_code_from_filename
-from score_table import get_score_tables
-from elem import ztoelem
+from script.utilities import clean_data_file
+from script.talys_modules import extract_code_from_filename
+from script.score_table import get_score_tables
+from script.elem import ztoelem
 
 
 def retrieve_external_data(

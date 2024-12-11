@@ -2,21 +2,7 @@ import re
 import json
 import os
 import logging
-from elem import elemtoz, PARTICLES
-
-
-# def open_json(file):
-#     if os.path.exists(file):
-#         with open(file) as json_file:
-#             # return json.load(json_file)
-#             try:
-#                 return json.load(json_file)
-#             except ValueError:
-#                 print(file, ": JSON decording has failed")
-
-#     else:
-#         return None
-
+from script.elem import elemtoz, PARTICLES
 
 def open_json(file_path):
     try:
