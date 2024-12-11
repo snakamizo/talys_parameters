@@ -1,5 +1,6 @@
 from elem import elemtoz
 
+
 def genenerate_six_digit_code_pn(element, formatted_mass):
     capitalized_element = element.capitalize()
     z = elemtoz(capitalized_element)

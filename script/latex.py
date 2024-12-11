@@ -1,6 +1,7 @@
 import os
 from config import LATEX_DOCUMENT_FILENAME
 
+
 def generate_latex_document(output_directory):
     latex_content = (
         "\\documentclass{article}\n"
@@ -12,7 +13,10 @@ def generate_latex_document(output_directory):
     with open(os.path.join(output_directory, LATEX_DOCUMENT_FILENAME), "w") as f:
         f.write(latex_content)
 
-def add_to_latex_document(output_directory, gnuplot_each_output_directory, projectile, mass, element):
+
+def add_to_latex_document(
+    output_directory, gnuplot_each_output_directory, projectile, mass, element
+):
 
     section_title = f"{projectile} induced {mass}{element}"
     latex_content = f"\\section{{{section_title}}}\n"
@@ -21,25 +25,28 @@ def add_to_latex_document(output_directory, gnuplot_each_output_directory, proje
     latex_content += "\\subsection{Cross Section Plot}\n"
     plot_dir = os.path.join(gnuplot_each_output_directory)
     plot_files1 = [
-        file_name for file_name in os.listdir(plot_dir)
-        if file_name.startswith("combined_cross_section_plot_") and file_name.endswith(".png")
+        file_name
+        for file_name in os.listdir(plot_dir)
+        if file_name.startswith("combined_cross_section_plot_")
+        and file_name.endswith(".png")
     ]
 
     sorted_plot_files1 = sorted(
         plot_files1,
         key=lambda x: int(os.path.basename(x).split("_")[-1].split(".")[0]),
-        reverse=True
+        reverse=True,
     )
 
     plot_files2 = [
-        file_name for file_name in os.listdir(plot_dir)
+        file_name
+        for file_name in os.listdir(plot_dir)
         if file_name.startswith("chi_squared_vs_input_") and file_name.endswith(".png")
     ]
 
     sorted_plot_files2 = sorted(
-            plot_files2,
-            key=lambda x: int(os.path.basename(x).split("_")[-1].split(".")[0]),
-            reverse=True
+        plot_files2,
+        key=lambda x: int(os.path.basename(x).split("_")[-1].split(".")[0]),
+        reverse=True,
     )
 
     for file_name in sorted_plot_files1:
@@ -67,7 +74,10 @@ def add_to_latex_document(output_directory, gnuplot_each_output_directory, proje
     with open(os.path.join(output_directory, LATEX_DOCUMENT_FILENAME), "a") as f:
         f.write(latex_content)
 
-def add_to_latex_document1(output_directory, gnuplot_each_output_directory, projectile, mass, element, residual):
+
+def add_to_latex_document1(
+    output_directory, gnuplot_each_output_directory, projectile, mass, element, residual
+):
 
     section_title = f"{projectile} induced {mass}{element} → {int(residual[1])}{residual[2]}{residual[0]}"
     latex_content = f"\\section{{{section_title}}}\n"
@@ -76,12 +86,16 @@ def add_to_latex_document1(output_directory, gnuplot_each_output_directory, proj
     latex_content += "\\subsection{Cross Section Plot}\n"
     plot_dir = os.path.join(gnuplot_each_output_directory)
     for file_name in os.listdir(plot_dir):
-        if file_name.startswith("combined_cross_section_plot_") and file_name.endswith(".png"):
+        if file_name.startswith("combined_cross_section_plot_") and file_name.endswith(
+            ".png"
+        ):
             file_path = os.path.join(plot_dir, file_name)
 
             if os.path.exists(file_path):
                 latex_content += f"\\begin{{figure}}[H]\n\\centering\n"
-                latex_content += f"\\includegraphics[width=0.8\\textwidth]{{{file_path}}}\n"
+                latex_content += (
+                    f"\\includegraphics[width=0.8\\textwidth]{{{file_path}}}\n"
+                )
                 latex_content += "\\end{figure}\n"
             else:
                 latex_content += "No Chi Squared Plot was emitted."
@@ -95,13 +109,16 @@ def add_to_latex_document1(output_directory, gnuplot_each_output_directory, proj
 
             if os.path.exists(file_path):
                 latex_content += f"\\begin{{figure}}[H]\n\\centering\n"
-                latex_content += f"\\includegraphics[width=0.8\\textwidth]{{{file_path}}}\n"
+                latex_content += (
+                    f"\\includegraphics[width=0.8\\textwidth]{{{file_path}}}\n"
+                )
                 latex_content += "\\end{figure}\n"
             else:
                 latex_content += "No Chi Squared Plot was emitted."
 
     with open(os.path.join(output_directory, LATEX_DOCUMENT_FILENAME), "a") as f:
         f.write(latex_content)
+
 
 def add_totalchi_to_latex_document(gnuplot_output_directory):
 
@@ -118,7 +135,9 @@ def add_totalchi_to_latex_document(gnuplot_output_directory):
     else:
         latex_content += "No Chi Squared Plot was emitted."
 
-    with open(os.path.join(gnuplot_output_directory, LATEX_DOCUMENT_FILENAME), "a") as f:
+    with open(
+        os.path.join(gnuplot_output_directory, LATEX_DOCUMENT_FILENAME), "a"
+    ) as f:
         f.write(latex_content)
 
 
@@ -137,13 +156,17 @@ def add_masschi_to_latex_document(gnuplot_output_directory, j):
     else:
         latex_content += "No Chi Squared vs Mass Plot was emitted."
 
-    with open(os.path.join(gnuplot_output_directory, LATEX_DOCUMENT_FILENAME), "a") as f:
+    with open(
+        os.path.join(gnuplot_output_directory, LATEX_DOCUMENT_FILENAME), "a"
+    ) as f:
         f.write(latex_content)
+
 
 def end_latex_document(output_directory):
     latex_content = "\\end{document}\n"
     with open(os.path.join(output_directory, LATEX_DOCUMENT_FILENAME), "a") as f:
         f.write(latex_content)
+
 
 def add_table_to_latex_document(gnuplot_output_directory, chi2_values_list):
     section_title = "Chi-Squared Values Table"
@@ -151,7 +174,9 @@ def add_table_to_latex_document(gnuplot_output_directory, chi2_values_list):
 
     # Begin the table
     latex_content += f"\\begin{{table}}[H]\n\\centering\n"
-    latex_content += f"\\begin{{tabular}}{{|c|" + "c|" * len(chi2_values_list[0]) + "}}\n"
+    latex_content += (
+        f"\\begin{{tabular}}{{|c|" + "c|" * len(chi2_values_list[0]) + "}}\n"
+    )
     latex_content += "\\hline\n"
 
     # Table headers
@@ -171,8 +196,11 @@ def add_table_to_latex_document(gnuplot_output_directory, chi2_values_list):
     latex_content += "\\label{tab:chi2_values}\n"
     latex_content += "\\end{table}\n"
 
-    with open(os.path.join(gnuplot_output_directory, LATEX_DOCUMENT_FILENAME), "a") as f:
+    with open(
+        os.path.join(gnuplot_output_directory, LATEX_DOCUMENT_FILENAME), "a"
+    ) as f:
         f.write(latex_content)
+
 
 def add_ratio_to_latex_document(gnuplot_output_directory, column_idx):
     """Add ratio plot to the LaTeX document."""
@@ -189,5 +217,7 @@ def add_ratio_to_latex_document(gnuplot_output_directory, column_idx):
     else:
         latex_content += "No Ratio Plot was emitted."
 
-    with open(os.path.join(gnuplot_output_directory, LATEX_DOCUMENT_FILENAME), "a") as f:
+    with open(
+        os.path.join(gnuplot_output_directory, LATEX_DOCUMENT_FILENAME), "a"
+    ) as f:
         f.write(latex_content)
