@@ -2,24 +2,11 @@ import re
 import json
 import os
 import logging
-from elem import elemtoz, PARTICLES
-
-
-# def open_json(file):
-#     if os.path.exists(file):
-#         with open(file) as json_file:
-#             # return json.load(json_file)
-#             try:
-#                 return json.load(json_file)
-#             except ValueError:
-#                 print(file, ": JSON decording has failed")
-
-#     else:
-#         return None
+from script.elem import elemtoz, PARTICLES
 
 def open_json(file_path):
     try:
-        with open(file_path, 'r') as f:
+        with open(file_path, "r") as f:
             return json.load(f)
     except json.JSONDecodeError as e:
         print(f"Error decoding JSON in file {file_path}: {e}")
@@ -98,7 +85,8 @@ def calc_mass(reaction, mass):
         return str(int(mass) - 1)
     else:
         return None
-    
+
+
 def calc_z(reaction, element):
     if reaction == "pn":
         return str(int(elemtoz(element.capitalize())) + 1)
@@ -121,6 +109,7 @@ def genenerate_six_digit_code(reaction, element, mass):
 
     return f"{z}{a}"
 
+
 def generate_six_digit_code_from_product_info(residual):
     ## Assuming the format as: "Mn052m"
     z = elemtoz(residual[0].capitalize()).zfill(3)
@@ -128,16 +117,17 @@ def generate_six_digit_code_from_product_info(residual):
 
     return f"{z}{a}{residual[2]}"
 
+
 def setup_logging(log_directory, log_file_name):
     log_file_path = os.path.join(log_directory, log_file_name)
     if not os.path.exists(log_directory):
-            os.makedirs(log_directory)
+        os.makedirs(log_directory)
 
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
+        format="%(asctime)s - %(levelname)s - %(message)s",
         handlers=[
             logging.FileHandler(log_file_path),  # Save the log in file
-            logging.StreamHandler()  # Show the log in terminal
-        ]
+            logging.StreamHandler(),  # Show the log in terminal
+        ],
     )

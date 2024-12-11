@@ -7,7 +7,6 @@ import logging
 from config import TALYS_PATH, FIT
 
 
-
 def create_talys_inp(input_file, inputs, energy_range, parameters):
     if not inputs:
         return
@@ -44,24 +43,26 @@ def create_talys_inp(input_file, inputs, energy_range, parameters):
 
 def run_talys(input_file, calc_directory):
 
-    p = Popen([os.path.join(TALYS_PATH, "bin/talys")], 
-            cwd = calc_directory,  
-            stdin=open(input_file),
-            stdout=PIPE,
-            stderr=PIPE)
+    p = Popen(
+        [os.path.join(TALYS_PATH, "bin/talys")],
+        cwd=calc_directory,
+        stdin=open(input_file),
+        stdout=PIPE,
+        stderr=PIPE,
+    )
 
     stdout, stderr = p.communicate()
 
-    with open(os.path.join(calc_directory, 'output.txt'), 'w') as outfile: 
+    with open(os.path.join(calc_directory, "output.txt"), "w") as outfile:
         outfile.write(stderr.decode("utf-8"))
         outfile.write(stdout.decode("utf-8"))
 
-    return 
-
+    return
 
 
 def search_residual_output(directory, product_six_digit_code):
     # Check if the last character of the six-digit code is a letter
+    matched_files = []
     last_char = product_six_digit_code[-1]
     # Set the pattern based on the letter (if present)
     if last_char == "g":
@@ -69,11 +70,18 @@ def search_residual_output(directory, product_six_digit_code):
         matched_files = glob.glob(pattern)
     elif last_char == "m":
         pattern = os.path.join(directory, f"rp*{product_six_digit_code[:-1]}*.L*")
-        matched_files = [file for file in glob.glob(pattern) if not file.endswith(".L00")]
+        matched_files = [
+            file for file in glob.glob(pattern) if not file.endswith(".L00")
+        ]
     else:
         pattern = os.path.join(directory, f"rp*{product_six_digit_code}*.tot")
         matched_files = glob.glob(pattern)
-    return matched_files[0] if matched_files else None
+
+    if len(matched_files) > 0:
+        return matched_files[0]
+
+    else:
+        return None
 
 
 def extract_code_from_filename(filename):

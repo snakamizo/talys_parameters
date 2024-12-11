@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 
 from config import SCORE_JSON_PATH
-from utils import open_json
+from script.utilities import open_json
 
 
 def get_latest(evaluations):

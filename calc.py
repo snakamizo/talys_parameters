@@ -1,40 +1,58 @@
 import os
 import json
 import logging
-import numpy as np
 from concurrent.futures import ProcessPoolExecutor
-
+import concurrent
+from glob import glob
+import numpy as np
+from tqdm import tqdm
+from copy import deepcopy
+import multiprocessing
 from config import (
     TALYS_INP_FILE_NAME,
     IAEA_MEDICAL_LIST,
     CALC_PATH,
+    EXFORTABLES_PATH,
     ENERGY_RANGE_MIN,
     ENERGY_RANGE_MAX,
     ENERGY_STEP,
     N,
+    TIMEOUT_SECONDS,
 )
-from plotting import (
-    load_experimental_data,
+from script.plotting import (
     retrieve_external_data,
     generate_combined_gnuplot_script,
     run_gnuplot,
-    generate_combined_gnuplot_script,
     generate_chi_squared_gnuplot_script,
-    generate_combined_chi_squared_gnuplot_script,
+    generate_total_average_chi_squared_gnuplot_script,
+    generate_mass_chi_squared_gnuplot_script,
+    generate_ratio_gnuplot_script,
 )
-from utils import (
+from script.utilities import (
     split_by_number,
     clean_data_file,
-    genenerate_six_digit_code,
-    setup_logging
+    setup_logging,
+    generate_six_digit_code_from_product_info,
 )
-from talys_modules import (
+from script.talys_modules import (
     create_talys_inp,
     run_talys,
     search_residual_output,
 )
-from score_table import get_score_tables
+from script.score_table import get_score_tables
 
+from script.chi_squared import (
+    calculate_combined_chi_squared,
+    load_simulation_data,
+)
+from script.latex import (
+    generate_latex_document,
+    add_to_latex_document1,
+    end_latex_document,
+    add_totalchi_to_latex_document,
+    add_masschi_to_latex_document,
+    add_ratio_to_latex_document,
+)
 
 parameter_check_cases = [
     {"ldmodel": 1, "colenhance": "n"},
@@ -44,91 +62,17 @@ parameter_check_cases = [
     {"ldmodel": 5, "colenhance": "n"},
 ]
 
-def interpolate_simulation(energy_exp, simulation_data):
-    """Linearly interpolation"""
-    for i in range(1, len(simulation_data)):
-        e1, cs1 = simulation_data[i - 1]
-        e2, cs2 = simulation_data[i]
 
-        if e1 <= energy_exp <= e2:
-            return cs1 + (cs2 - cs1) * (energy_exp - e1) / (e2 - e1)
-    return None  # If outside the range of simulation data
+def load_score_dict(filepath):
+    if os.path.exists(filepath):
+        with open(filepath, "r") as f:
+            score_dict = json.load(f)
+        print(f"Score dictionary loaded from {filepath}")
+        return score_dict
+    else:
+        print(f"Score dictionary file not found at {filepath}")
+        return {}
 
-
-def calculate_combined_chi_squared(
-    output_directory, cleaned_external_files, simulation_data, ERROR_THRESHOLD, code
-):
-    chi_squared = 0.0
-    dataset_chi_squared_list = []
-    valid_datasets = 0.0
-    output_file_path = os.path.join(
-        output_directory, f"chi_squared_values_{code}.txt"
-    )
-
-    with open(output_file_path, "w") as output_file:
-        output_file.write("#File Name\tChi-Squared Value\n")
-        for cleaned_external_file in cleaned_external_files:
-            experimental_data = load_experimental_data(
-                cleaned_external_file
-            )  # Load the external file
-            valid_points = 0.0
-            chi_squared_for_dataset = 0.0  # Initialize chi-squared for this dataset
-
-            print(f"\nProcessing file: {cleaned_external_file}")
-
-            for exp_point in experimental_data:
-                try:
-                    # Try to unpack assuming exp_point is iterable
-                    energy_exp, _, cross_section_exp, delta_cross_exp, _ = exp_point
-                except TypeError:
-                    print(
-                        f"Skipping invalid data point in file {cleaned_external_file}: {exp_point}"
-                    )
-                    continue  # Skip to the next point if unpacking fails
-
-                if delta_cross_exp < ERROR_THRESHOLD * cross_section_exp:
-                    print(
-                        f"Skipping data point due to small delta_cross_exp (< {ERROR_THRESHOLD * 100}% of cross_section) for energy {energy_exp}"
-                    )
-                    continue
-
-                sim_cross_section = interpolate_simulation(energy_exp, simulation_data)
-
-                if sim_cross_section is not None and delta_cross_exp > 0:
-                    chi_squared_for_dataset += (
-                        (cross_section_exp - sim_cross_section) ** 2
-                    ) / (delta_cross_exp**2)
-                    valid_points += 1  # Count this point as valid
-                else:
-                    print(
-                        f"Skipping data point due to invalid delta_cross_exp or no simulation match for energy {energy_exp}"
-                    )
-
-            if valid_points > 0:
-                normalized_chi_squared = chi_squared_for_dataset / valid_points
-                chi_squared += normalized_chi_squared
-                dataset_chi_squared_list.append(normalized_chi_squared)
-                valid_datasets += 1
-                output_file.write(
-                    f"{cleaned_external_file}\t{normalized_chi_squared:.6f}\n"
-                )
-                print(f"Valid points for {cleaned_external_file}: {valid_points}")
-                print(
-                    f"Normalized chi-squared for dataset {cleaned_external_file}: {normalized_chi_squared:.6f}"
-                )
-            else:
-                print(
-                    f"No valid points in dataset {cleaned_external_file}, skipping normalization."
-                )
-
-    if valid_datasets > 0:
-        chi_squared /= valid_datasets
-    print("\nChi-squared values for each dataset:", dataset_chi_squared_list)
-    print(f"Number of valid datasets: {valid_datasets}")
-    return chi_squared
-
-def load_simulation_data(file_path):
-    return np.loadtxt(file_path, usecols=(0, 1))
 
 def get_IAEA_medical_isotope_nuclides() -> list:
     # format
@@ -140,151 +84,351 @@ def get_IAEA_medical_isotope_nuclides() -> list:
     for line in f.readlines():
         l = line.split()
         projectile = l[1]
-        target = split_by_number( l[0] )
-        residual = split_by_number( l[3] )
+        target = split_by_number(l[0])
+        residual = split_by_number(l[3])
 
-        medical_reactions += [ {"projectile": projectile, "element": target[0], "mass": target[1], "target": target, "residual": residual} ]
+        if (
+            target[1] == "000"
+            or projectile == "g"
+            or projectile == "n"
+            or projectile == "d"
+            or projectile == "p"
+            or projectile == "h"
+            or (target == ["I", "127", ""] and residual == ["Xe", "122", ""])
+            or residual == ["Ba", "128", ""]
+            or (
+                projectile == "p"
+                and target == ["Th", "232", ""]
+                and residual == ["Ra", "225", ""]
+            )
+            or (
+                projectile == "p"
+                and target == ["Tl", "203", ""]
+                and residual == ["Pb", "202", "m"]
+            )
+            or (
+                projectile == "d"
+                and target == ["Yb", "176", ""]
+                and residual == ["Lu", "177", "g"]
+            )
+            or (target == ["Th", "232", ""] and residual == ["Ac", "225", ""])
+            or (target == ["Th", "232", ""] and residual == ["Th", "227", ""])
+        ):
+            # int(elemtoz(target[0])) != int(elemtoz(residual[0])) or
+            # int(target[1]) != int(residual[1]) + 1):
+            continue
+
+        medical_reactions += [
+            {
+                "projectile": projectile,
+                "element": target[0],
+                "mass": target[1],
+                "target": target,
+                "residual": residual,
+            }
+        ]
 
     return medical_reactions
 
 
+def process(
+    input,
+    score_dict,
+    gnuplot_output_directory,
+    chi2_value_total_averages,
+    chi2_values_list,
+):
+    logging.info(input)
+
+    projectile = input["projectile"]
+    element = input["element"]
+    mass = int(input["mass"])
+    target = input["target"]
+    residual = input["residual"]
+    residual_mass = int(residual[1])
+    logging.info(f"residual == {residual_mass}, type: {type(residual_mass)}")
+
+    energy_range = f"{ENERGY_RANGE_MIN} {ENERGY_RANGE_MAX} {ENERGY_STEP}"
+
+    product_six_digit_code = generate_six_digit_code_from_product_info(residual)
+    logging.info("Generated six-digit code: %s", product_six_digit_code)
+
+    cleaned_selected_exfortables_files = []
+    cleaned_all_exfortables_files = []
+
+    exfortables_directory = os.path.join(
+        EXFORTABLES_PATH,
+        f"{projectile}",
+        f"{element.capitalize()}{mass:03}",
+        "residual",
+        product_six_digit_code,
+    )
+    retrieve_external_data(
+        exfortables_directory,
+        CALC_PATH,
+        cleaned_selected_exfortables_files,
+        cleaned_all_exfortables_files,
+        product_six_digit_code,
+        score_dict,
+    )
+
+    cleaned_output_files = []
+    chi2_values = []
+
+    for i in range(len(parameter_check_cases)):
+        calc_directory = os.path.join(
+            CALC_PATH, f"{projectile}-{element}{mass}_chisquared_{i}"
+        )
+        if not os.path.exists(calc_directory):
+            os.makedirs(calc_directory, exist_ok=True)
+            input_file = os.path.join(calc_directory, TALYS_INP_FILE_NAME)
+            create_talys_inp(input_file, input, energy_range, parameter_check_cases[i])
+            run_talys(input_file, calc_directory)
+        else:
+            logging.info(
+                f"Directory {calc_directory} already exists, skipping the calculation."
+            )
+
+        # Search for and clean data files for each six-digit code
+        data_file = search_residual_output(calc_directory, product_six_digit_code)
+        if not data_file:
+            logging.info(
+                f"No 'rp*' files found with the six-digits '{product_six_digit_code}' in the directory."
+            )
+            continue
+        cleaned_output_file = os.path.join(
+            calc_directory, f"cleaned_{os.path.basename(data_file)}"
+        )
+        clean_data_file(data_file, cleaned_output_file)
+        cleaned_output_files.append(cleaned_output_file)
+
+        simulation_data = load_simulation_data(cleaned_output_file)
+        cross_section_sim_max = np.max(simulation_data[:, 1])
+        logging.debug(f"Maximum simulation cross-section: {cross_section_sim_max}")
+        combined_chi_squared = calculate_combined_chi_squared(
+            CALC_PATH,
+            cleaned_selected_exfortables_files,
+            simulation_data,
+            product_six_digit_code,
+            projectile,
+            target,
+            i,
+            cross_section_sim_max,
+        )
+        chi2_values.append(combined_chi_squared)
+
+    chi2_values_array = np.array(chi2_values, dtype=float)
+    logging.info(
+        f"chi2_values_array = {chi2_values_array}, type: {chi2_values_array.dtype}"
+    )
+    for idx, value in enumerate(chi2_values_array):
+        chi2_value_total_averages[idx] += value
+
+    chi2_value_array_with_mass = np.concatenate(
+        [np.array([residual_mass], dtype=np.float64), chi2_values_array]
+    )
+    logging.info(f"chi2_value_array_with_mass: {chi2_value_array_with_mass}")
+    chi2_values_list.append(chi2_value_array_with_mass)
+
+    gnuplot_each_output_directory = os.path.join(
+        gnuplot_output_directory,
+        f"gnuplot_output_{projectile}-{mass}{element}_{residual[1]}{residual[2]}{residual[0]}",
+    )
+    os.makedirs(gnuplot_each_output_directory, exist_ok=True)
+
+    plot_file = os.path.join(
+        gnuplot_each_output_directory,
+        f"combined_cross_section_plot_{product_six_digit_code}.png",
+    )
+    gnuplot_script = generate_combined_gnuplot_script(
+        cleaned_output_files,
+        cleaned_selected_exfortables_files,
+        cleaned_all_exfortables_files,
+        plot_file,
+        element,
+        mass,
+        product_six_digit_code,
+    )
+    gnuplot_script_file = os.path.join(
+        gnuplot_each_output_directory,
+        f"combined_cross_section_plot_{product_six_digit_code}.gp",
+    )
+    run_gnuplot(gnuplot_script, gnuplot_script_file)
+
+    # Plot chi-squared vs m2constant
+
+    chi_squared_plot_file = os.path.join(
+        gnuplot_each_output_directory,
+        f"chi_squared_vs_input_{product_six_digit_code}.png",
+    )
+    gnuplot_script = generate_chi_squared_gnuplot_script(
+        chi2_values, chi_squared_plot_file, element, mass, product_six_digit_code
+    )
+    gnuplot_script_file = os.path.join(
+        gnuplot_each_output_directory, f"chi_squared_vs_input.gp"
+    )
+    run_gnuplot(gnuplot_script, gnuplot_script_file)
+
+    add_to_latex_document1(
+        gnuplot_output_directory,
+        gnuplot_each_output_directory,
+        projectile,
+        mass,
+        element,
+        residual,
+    )
+
 
 def main():
     ## get nuclides to calculate
-    # medical_isotope_reactions = get_IAEA_medical_isotope_nuclides()
-    medical_isotope_reactions = [
-    {"projectile": "p", "element": "ga", "mass": 69},
-    {"projectile": "p", "element": "y", "mass": 89},
-    {"projectile": "p", "element": "te", "mass": 124}
-]
-    ## get score table in Python dictionary
+    medical_isotope_reactions = get_IAEA_medical_isotope_nuclides()
+
+    # medical_isotope_reactions = [
+    # {"projectile": "p", "element": "n", "mass": 14, "target": ['N', '014', ''], "residual": ['C', '011', '']},
+    # {"projectile": "p", "element": "o", "mass": 18, "target": ['O', '018', ''], "residual": ['F', '018', '']},
+    # {"projectile": "p", "element": "ni", "mass": 64, "target": ['Ni', '064', ''], "residual": ['Cu', '064', '']},
+    # {"projectile": "p", "element": "ga", "mass": 69, "target": ['Ga', '069', ''], "residual": ['Ge', '068', '']},
+    # {"projectile": "p", "element": "y", "mass": 89, "target": ['Y', '089', ''], "residual": ['Zr', '089', '']},
+    # {"projectile": "p", "element": "y", "mass": 89, "target": ['Y', '089', ''], "residual": ['Zr', '088', '']},
+    # {"projectile": "p", "element": "y", "mass": 89, "target": ['Y', '089', ''], "residual": ['Y', '088', '']},
+    # {"projectile": "p", "element": "mo", "mass": 100, "target": ['Mo', '100', ''], "residual": ['Tc', '099', 'm']},
+    # {"projectile": "p", "element": "te", "mass": 124, "target": ['Te', '124', ''], "residual": ['I', '123', '']}
+    # ]
+    num_reactions = len(medical_isotope_reactions)
+    os.makedirs(CALC_PATH, exist_ok=True)
     score_dict = get_score_tables()
 
     setup_logging(CALC_PATH, "log.txt")
+    logging.info(f"Number of valid medical isotope reactions: {num_reactions}")
+    # logging.info(f"Weight_list: {score_dict}")
 
-    for input in medical_isotope_reactions:
-        logging.info(input)
-        projectile = input["projectile"]
-        element = input["element"]
-        mass = int(input["mass"])
+    gnuplot_output_directory = os.path.join(
+        CALC_PATH, "gnuplot_output_excluding0_Th_out"
+    )
+    os.makedirs(gnuplot_output_directory, exist_ok=True)
+    generate_latex_document(gnuplot_output_directory)
 
-        ################### Do we need this part?
-        output_directory = os.path.join(
-            CALC_PATH,
-            f"{projectile}-{element}{mass}_chisquared_triple_test",
+    in_process_targets = []
+
+    manager = multiprocessing.Manager()
+    chi2_value_total_averages = manager.list(np.zeros(5))
+    chi2_values_list = manager.list()
+    skipped_reactions = manager.list()
+
+    with concurrent.futures.ProcessPoolExecutor(max_workers=N) as executor:
+        futures = []
+        with tqdm(
+            total=len(medical_isotope_reactions), desc="Processing reactions"
+        ) as progress_bar:
+            for input in medical_isotope_reactions:
+                target_identifier = (
+                    f"{input['projectile']}-{input['element']}{input['mass']}"
+                )
+
+                if target_identifier in in_process_targets:
+                    skipped_reactions.append(input)
+                    continue
+
+                in_process_targets.append(target_identifier)
+                futures.append(
+                    executor.submit(
+                        process,
+                        input,
+                        score_dict,
+                        gnuplot_output_directory,
+                        chi2_value_total_averages,
+                        chi2_values_list,
+                    )
+                )
+
+            # Wait for all futures to complete
+            for future in concurrent.futures.as_completed(futures):
+                progress_bar.update(1)
+                result_input = medical_isotope_reactions[futures.index(future)]
+                result_target_identifier = f"{result_input['projectile']}-{result_input['element']}{result_input['mass']}"
+
+                # in_process_targets.remove(result_target_identifier)
+                # future.result()
+
+                try:
+                    future.result(timeout=TIMEOUT_SECONDS)
+                except concurrent.futures.TimeoutError:
+                    logging.error(f"Processing timed out for: {result_input}")
+                    skipped_reactions.append(result_input)
+                except Exception as e:
+                    logging.error(f"Error processsing {result_input}: {e}")
+                finally:
+                    if result_target_identifier in in_process_targets:
+                        in_process_targets.remove(result_target_identifier)
+
+    logging.debug(f"Skipped Reactionsss: {skipped_reactions}")
+    for input in skipped_reactions:
+        try:
+            process(
+                input,
+                score_dict,
+                gnuplot_output_directory,
+                chi2_value_total_averages,
+                chi2_values_list,
+            )
+        except Exception as e:
+            logging.error(f"Error retrying {input}: {e}")
+
+    chi2_values_list = [arr for arr in chi2_values_list if not np.all(arr[1:6] == 0)]
+    num_reactions = len(chi2_values_list)
+
+    chi2_value_total_averages = np.array(chi2_value_total_averages)
+    chi2_value_total_averages /= num_reactions
+
+    chi_squared_total_average_plot_file = os.path.join(
+        gnuplot_output_directory, "chi_squared_total_average_vs_input.png"
+    )
+    gnuplot_script4 = generate_total_average_chi_squared_gnuplot_script(
+        chi2_value_total_averages, chi_squared_total_average_plot_file
+    )
+    gnuplot_script_file4 = os.path.join(
+        gnuplot_output_directory, "chi_squared_total_average_vs_input.gp"
+    )
+    run_gnuplot(gnuplot_script4, gnuplot_script_file4)
+
+    logging.info(f"The list chi2_values_list contains {len(chi2_values_list)} arrays.")
+
+    add_totalchi_to_latex_document(gnuplot_output_directory)
+    logging.info(f"chi2_values_list: {chi2_values_list}")
+
+    # add_table_to_latex_document(gnuplot_output_directory, chi2_values_list)
+
+    for j in range(1, 6):
+        chi_squared_value_mass_plot_file = os.path.join(
+            gnuplot_output_directory, f"chi_squared_value_vs_mass_inp{j}.png"
         )
-        os.makedirs(output_directory, exist_ok=True)
+        gnuplot_script5 = generate_mass_chi_squared_gnuplot_script(
+            chi2_values_list, chi_squared_value_mass_plot_file, j
+        )
+        gnuplot_script_file5 = os.path.join(
+            gnuplot_output_directory, f"chi_squared_value_vs_mass_inp{j}.gp"
+        )
+        run_gnuplot(gnuplot_script5, gnuplot_script_file5)
+        add_masschi_to_latex_document(gnuplot_output_directory, j)
 
-        energy_range = f"{ENERGY_RANGE_MIN} {ENERGY_RANGE_MAX} {ENERGY_STEP}"
+    for _, column_idx in enumerate([1, 3, 4, 5], start=1):
+        ratio_plot_file = os.path.join(
+            gnuplot_output_directory, f"ratio_vs_mass_col{column_idx}.png"
+        )
+        gnuplot_script_ratio = generate_ratio_gnuplot_script(
+            chi2_values_list,
+            ratio_plot_file,
+            numerator_idx=column_idx,
+            denominator_idx=2,
+        )
+        gnuplot_script_file_ratio = os.path.join(
+            gnuplot_output_directory, f"ratio_vs_mass_col{column_idx}.gp"
+        )
+        run_gnuplot(gnuplot_script_ratio, gnuplot_script_file_ratio)
+        add_ratio_to_latex_document(gnuplot_output_directory, column_idx)
 
-        for i in range(len(parameter_check_cases)): 
-            calc_directory = os.path.join(
-                output_directory, f"{projectile}-{element}{mass}_chisquared_{i}"
-            )  # CALC_PATH
-            os.makedirs(calc_directory, exist_ok=True)
-
-            ## create input
-            input_file = os.path.join(calc_directory, TALYS_INP_FILE_NAME)
-            create_talys_inp(input_file, input, energy_range, parameter_check_cases[i])
-
-            # actual run
-            run_talys(input_file, calc_directory)
-
-
-        # cleaned_external_files = [[] for _ in range(3)]
-        # cleaned_all_external_files = [[] for _ in range(3)]
-        # cleaned_output_files = [[] for _ in range(3)]
-        # chi2_values = [[] for _ in range(3)]
-        # chi2_value_averages = []
-
-        # product_six_digit_codes = [
-        #     genenerate_six_digit_code("pn", element, f"{mass:03}"),
-        #     genenerate_six_digit_code("p2n", element, f"{mass:03}"),
-        #     genenerate_six_digit_code("ppn", element, f"{mass:03}"),
-        # ]
-
-        # for i, code in enumerate(product_six_digit_codes):
-        #     exfortables_directory = os.path.join(
-        #         EXFOR_TABLES_PATH,
-        #         f"{projectile}",
-        #         f"{element.capitalize()}{mass:03}",
-        #         "residual",
-        #         code,
-        #     )
-        #     retrieve_external_data(
-        #         exfortables_directory,
-        #         output_directory,
-        #         cleaned_external_files[i],
-        #         cleaned_all_external_files[i],
-        #         code,
-        #         score_dict,
-        #     )
-        #     # Search for and clean data files for each six-digit code
-        #     for j, code in enumerate(product_six_digit_codes):
-        #         data_file = search_residual_output(calc_directory, code)
-        #         if not data_file:
-        #             print(
-        #                 f"No 'rp*' files found with the six-digits '{code}' in the directory."
-        #             )
-        #             continue
-        #         cleaned_output_file = os.path.join(
-        #             calc_directory, f"cleaned_{os.path.basename(data_file)}"
-        #         )
-        #         clean_data_file(data_file, cleaned_output_file)
-        #         cleaned_output_files[j].append(cleaned_output_file)
-
-        #         simulation_data = load_simulation_data(cleaned_output_file)
-        #         combined_chi_squared = calculate_combined_chi_squared(
-        #             output_directory,
-        #             cleaned_external_files[j],
-        #             simulation_data,
-        #             ERROR_THRESHOLD,
-        #             code,
-        #         )
-        #         chi2_values[j].append(combined_chi_squared)
-
-        #     chi2_value_average = sum(chi2_values[j][-1] for j in range(3)) / 3.0
-        #     chi2_value_averages.append(chi2_value_average)
-
-        # # Plot xs of TALYS calculation and experimental data
-        # for j, code in enumerate(product_six_digit_codes):
-        #     plot_file = os.path.join(
-        #         output_directory, f"combined_cross_section_plot_{code}.png"
-        #     )
-        #     gnuplot_script = generate_combined_gnuplot_script(
-        #         cleaned_output_files[j],
-        #         cleaned_external_files[j],
-        #         cleaned_all_external_files[j],
-        #         plot_file,
-        #     )
-        #     gnuplot_script_file = os.path.join(
-        #         output_directory, f"combined_cross_section_plot_{code}.gp"
-        #     )
-        #     run_gnuplot(gnuplot_script, gnuplot_script_file)
-
-        # # Plot chi-squared vs m2constant
-        # for j, code in enumerate(product_six_digit_codes):
-        #     chi_squared_plot_file = os.path.join(
-        #         output_directory, f"chi_squared_vs_input_{code}.png"
-        #     )
-        #     gnuplot_script = generate_chi_squared_gnuplot_script(
-        #         chi2_values[j], chi_squared_plot_file
-        #     )
-        #     gnuplot_script_file = os.path.join(
-        #         output_directory, f"chi_squared_vs_input_{j+1}.gp"
-        #     )
-        #     run_gnuplot(gnuplot_script, gnuplot_script_file)
-
-        # chi_squared_combined_plot_file = os.path.join(
-        #     output_directory, f"chi_squared_average_vs_input.png"
-        # )
-        # gnuplot_script3 = generate_combined_chi_squared_gnuplot_script(
-        #     chi2_value_averages, chi_squared_combined_plot_file
-        # )
-        # gnuplot_script_file3 = os.path.join(
-        #     output_directory, "chi_squared_average_vs_input.gp"
-        # )
-        # run_gnuplot(gnuplot_script3, gnuplot_script_file3)
+    end_latex_document(gnuplot_output_directory)
+    logging.info("All process finished.")
 
 
 if __name__ == "__main__":
