@@ -17,9 +17,9 @@ TALYS_INP_FILE_NAME = "talys.inp"
 IAEA_MEDICAL_LIST = "./data/IAEA_medical_isotope.dat"
 SCORE_JSON_PATH = os.path.join(HOME_DIR, "talys/json")
 
-ENERGY_RANGE_MIN = 1.0
+ENERGY_RANGE_MIN = 10.0
 ENERGY_RANGE_MAX = 60.0
-ENERGY_STEP = 0.5
+ENERGY_STEP = 20
 
 
 ## Number of parallel processes

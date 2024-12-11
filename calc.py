@@ -280,10 +280,10 @@ def process(
 
 
 def main():
-    ## get nuclides to calculate
-    medical_isotope_reactions = get_IAEA_medical_isotope_nuclides()
+    ## Generate the dictionary of nuclides to calculate
+    # medical_isotope_reactions = get_IAEA_medical_isotope_nuclides()
 
-    # medical_isotope_reactions = [
+    medical_isotope_reactions = [
     # {"projectile": "p", "element": "n", "mass": 14, "target": ['N', '014', ''], "residual": ['C', '011', '']},
     # {"projectile": "p", "element": "o", "mass": 18, "target": ['O', '018', ''], "residual": ['F', '018', '']},
     # {"projectile": "p", "element": "ni", "mass": 64, "target": ['Ni', '064', ''], "residual": ['Cu', '064', '']},
@@ -292,15 +292,16 @@ def main():
     # {"projectile": "p", "element": "y", "mass": 89, "target": ['Y', '089', ''], "residual": ['Zr', '088', '']},
     # {"projectile": "p", "element": "y", "mass": 89, "target": ['Y', '089', ''], "residual": ['Y', '088', '']},
     # {"projectile": "p", "element": "mo", "mass": 100, "target": ['Mo', '100', ''], "residual": ['Tc', '099', 'm']},
-    # {"projectile": "p", "element": "te", "mass": 124, "target": ['Te', '124', ''], "residual": ['I', '123', '']}
-    # ]
+    {"projectile": "p", "element": "te", "mass": 124, "target": ['Te', '124', ''], "residual": ['I', '123', '']}
+    ]
+
     num_reactions = len(medical_isotope_reactions)
     os.makedirs(CALC_PATH, exist_ok=True)
     score_dict = get_score_tables()
 
     setup_logging(CALC_PATH, "log.txt")
     logging.info(f"Number of valid medical isotope reactions: {num_reactions}")
-    # logging.info(f"Weight_list: {score_dict}")
+
 
     gnuplot_output_directory = os.path.join(
         CALC_PATH, "gnuplot_output_excluding0_Th_out"
