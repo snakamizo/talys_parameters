@@ -62,6 +62,7 @@ def run_talys(input_file, calc_directory):
 
 def search_residual_output(directory, product_six_digit_code):
     # Check if the last character of the six-digit code is a letter
+    matched_files = []
     last_char = product_six_digit_code[-1]
     # Set the pattern based on the letter (if present)
     if last_char == "g":
@@ -73,7 +74,12 @@ def search_residual_output(directory, product_six_digit_code):
     else:
         pattern = os.path.join(directory, f"rp*{product_six_digit_code}*.tot")
         matched_files = glob.glob(pattern)
-    return matched_files[0] if matched_files else None
+    
+    if len(matched_files) > 0:
+        return matched_files[0]
+    
+    else:
+        return None
 
 
 def extract_code_from_filename(filename):
