@@ -127,11 +127,12 @@ def generate_combined_gnuplot_script(
 ):
     product_mass = int(code[3:6])
     product_element = ztoelem(int(code[:3]))
+    isomer = code[-1] if code[-1].isalpha() else ""
 
     gnuplot_script = f"""
 set terminal pngcairo enhanced font 'Arial,15' size 800,600
 set output '{plot_file}'
-set title 'Cross Section {mass}{element.capitalize()} → {product_mass}{product_element}'
+set title 'Cross Section {mass}{element.capitalize()} → {product_mass}{product_element}{isomer}'
 set xlabel 'Energy (MeV)' font 'Arial,15'
 set ylabel 'Cross Section (mb)' font 'Arial,15'
 set key font 'Arial,10' 
@@ -174,14 +175,17 @@ plot """
 def generate_chi_squared_gnuplot_script(chi2_values, plot_file, element, mass, code):
     product_mass = int(code[3:6])
     product_element = ztoelem(int(code[:3]))
+    isomer = code[-1] if code[-1].isalpha() else ""
     gnuplot_script = f"""
 set terminal pngcairo enhanced font 'Arial,15' size 800,600
 set output '{plot_file}'
-set title 'Chi-squared vs Input file {mass}{element.capitalize()} → {product_mass}{product_element}'
+set title 'Chi-squared vs Input file {mass}{element.capitalize()} → {product_mass}{product_element}{isomer}'
 set xlabel 'Input file'
 set ylabel 'Chi-squared'
+set xtics 1
+unset xtics 1
 set grid
-plot '-' using 1:2 with linespoints title 'Chi-squared'
+plot '-' using 1:2 with linespoints pt 7 title 'Chi-squared'
 """
     # Add the m2constant and chi2_values pairs to the script
     for index, chi2_value in enumerate(chi2_values, start=1):
