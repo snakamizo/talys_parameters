@@ -22,7 +22,11 @@ for line in f.readlines():
 
     dic = {}
     latex_target = "$^{" + tmass + "}$"+target[0]
-    latex_residual = "$^{" + rmass + "}$"+residual[0]
 
+    if residual[2]:
+        isomeric = "\mathrm" + "{" + residual[2] + "}"
+        latex_residual = "$^{" + rmass + isomeric + "}$"+residual[0]
+    else:
+        latex_residual = "$^{" + rmass + "}$"+residual[0]
 
     print( f"{z:5} {latex_target:20} {projectile:8} X    {latex_residual:20}")
