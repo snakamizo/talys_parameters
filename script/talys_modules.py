@@ -1,9 +1,9 @@
 import os
 from subprocess import Popen, PIPE
 import glob
-from pathlib import Path
 import re
 import logging
+
 from config import TALYS_PATH, FIT
 
 
