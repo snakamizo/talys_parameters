@@ -14,76 +14,23 @@ def generate_latex_document(output_directory):
         f.write(latex_content)
 
 
+
 def add_to_latex_document(
-    output_directory, gnuplot_each_output_directory, projectile, mass, element
-):
-
-    section_title = f"{projectile} induced {mass}{element}"
-    latex_content = f"\\section{{{section_title}}}\n"
-
-    # First subsection: Cross Section Plot
-    latex_content += "\\subsection{Cross Section Plot}\n"
-    plot_dir = os.path.join(gnuplot_each_output_directory)
-    plot_files1 = [
-        file_name
-        for file_name in os.listdir(plot_dir)
-        if file_name.startswith("combined_cross_section_plot_")
-        and file_name.endswith(".png")
-    ]
-
-    sorted_plot_files1 = sorted(
-        plot_files1,
-        key=lambda x: int(os.path.basename(x).split("_")[-1].split(".")[0]),
-        reverse=True,
-    )
-
-    plot_files2 = [
-        file_name
-        for file_name in os.listdir(plot_dir)
-        if file_name.startswith("chi_squared_vs_input_") and file_name.endswith(".png")
-    ]
-
-    sorted_plot_files2 = sorted(
-        plot_files2,
-        key=lambda x: int(os.path.basename(x).split("_")[-1].split(".")[0]),
-        reverse=True,
-    )
-
-    for file_name in sorted_plot_files1:
-        file_path = os.path.join(plot_dir, file_name)
-        latex_content += f"\\begin{{figure}}[H]\n\\centering\n"
-        latex_content += f"\\includegraphics[width=\\textwidth]{{{file_path}}}\n"
-        latex_content += "\\end{figure}\n"
-
-    # Second subsection: Chi Squared Calculation for Each Product
-    latex_content += "\\subsection{Chi Squared Calculation for Each Product}\n"
-    for file_name in sorted_plot_files2:
-        file_path = os.path.join(plot_dir, file_name)
-        latex_content += f"\\begin{{figure}}[H]\n\\centering\n"
-        latex_content += f"\\includegraphics[width=\\textwidth]{{{file_path}}}\n"
-        latex_content += "\\end{figure}\n"
-
-    # Last subsection: Averaged Chi Squared Calculation
-    latex_content += "\\subsection{Averaged Chi Squared Calculation}\n"
-    avg_file_path = os.path.join(plot_dir, "chi_squared_average_vs_input.png")
-    if os.path.exists(avg_file_path):
-        latex_content += f"\\begin{{figure}}[H]\n\\centering\n"
-        latex_content += f"\\includegraphics[width=\\textwidth]{{{avg_file_path}}}\n"
-        latex_content += "\\end{figure}\n"
-
-    with open(os.path.join(output_directory, LATEX_DOCUMENT_FILENAME), "a") as f:
-        f.write(latex_content)
-
-
-def add_to_latex_document1(
     output_directory, gnuplot_each_output_directory, projectile, mass, element, residual
 ):
 
-    section_title = f"{projectile} induced {mass}{element} → {int(residual[1])}{residual[2]}{residual[0]}"
-    latex_content = f"\\section{{{section_title}}}\n"
+    latex_content = ""
+    formatted_target = "$^{" + mass + "}$" + element 
+    formatted_residual = "$^{" +  str(int(residual[1])) + residual[2] + "}" + residual[0]
+    formatted_reaction = formatted_target + "(" + projectile + ",X)" + formatted_residual
+    label_xs = f"appfig:x{mass}{element}{residual}{''.join(residual)}"
+    label_kai = f"appfig:kai{mass}{element}{residual}{''.join(residual)}"
+
+    # section_title = f"{projectile} induced {mass}{element} → {int(residual[1])}{residual[2]}{residual[0]}"
+    latex_content = f"\\subsubsection{{{formatted_reaction}}}\n"
 
     # First subsection: Cross Section Plot
-    latex_content += "\\subsection{Cross Section Plot}\n"
+    # latex_content += "\\subsection{Cross Section Plot}\n"
     plot_dir = os.path.join(gnuplot_each_output_directory)
     for file_name in os.listdir(plot_dir):
         if file_name.startswith("combined_cross_section_plot_") and file_name.endswith(
@@ -96,12 +43,14 @@ def add_to_latex_document1(
                 latex_content += (
                     f"\\includegraphics[width=0.8\\textwidth]{{{file_path}}}\n"
                 )
+                latex_content += "\\caption{Cross section plot of " + formatted_reaction + "}\n"
+                latex_content += f"\\label{{label_xs}}\n"
                 latex_content += "\\end{figure}\n"
             else:
                 latex_content += "No Chi Squared Plot was emitted."
 
     # Second subsection: Chi Squared Calculation for Each Product
-    latex_content += "\\subsection{Chi Squared Calculation for Each Product}\n"
+    # latex_content += "\\subsection{Chi Squared Calculation for Each Product}\n"
     plot_dir = os.path.join(gnuplot_each_output_directory)
     for file_name in os.listdir(plot_dir):
         if file_name.startswith("chi_squared_vs_input_") and file_name.endswith(".png"):
@@ -112,6 +61,8 @@ def add_to_latex_document1(
                 latex_content += (
                     f"\\includegraphics[width=0.8\\textwidth]{{{file_path}}}\n"
                 )
+                latex_content += "\\caption{Chi Squared Calculation for " + formatted_reaction +  "}\n" 
+                latex_content += f"\\label{{label_kai}}\n"
                 latex_content += "\\end{figure}\n"
             else:
                 latex_content += "No Chi Squared Plot was emitted."
@@ -122,8 +73,9 @@ def add_to_latex_document1(
 
 def add_totalchi_to_latex_document(gnuplot_output_directory):
 
-    section_title = "Total chi squared value for each input"
-    latex_content = f"\\section{{{section_title}}}\n"
+    section_title = "Total chi squared value from four "
+    latex_content = ""
+    # latex_content = f"\\section{{{section_title}}}\n"
 
     plot_dir = os.path.join(gnuplot_output_directory)
     avg_file_path = os.path.join(plot_dir, "chi_squared_total_average_vs_input.png")
@@ -131,6 +83,8 @@ def add_totalchi_to_latex_document(gnuplot_output_directory):
     if os.path.exists(avg_file_path):
         latex_content += f"\\begin{{figure}}[H]\n\\centering\n"
         latex_content += f"\\includegraphics[width=\\textwidth]{{{avg_file_path}}}\n"
+        latex_content += "\\caption{" + section_title +  "}" 
+        latex_content += f"\\label{{label_kai}}\n"
         latex_content += "\\end{figure}\n"
     else:
         latex_content += "No Chi Squared Plot was emitted."
@@ -143,8 +97,9 @@ def add_totalchi_to_latex_document(gnuplot_output_directory):
 
 def add_masschi_to_latex_document(gnuplot_output_directory, j):
 
-    section_title = f"Chi squared value vs Residual Mass"
-    latex_content = f"\\section{{{section_title}}}\n"
+    # section_title = f"Chi squared value vs Residual Mass"
+    latex_content = ""
+    # latex_content = f"\\section{{{section_title}}}\n"
 
     plot_dir = os.path.join(gnuplot_output_directory)
     avg_file_path = os.path.join(plot_dir, f"chi_squared_value_vs_mass_inp{j}.png")
@@ -152,6 +107,8 @@ def add_masschi_to_latex_document(gnuplot_output_directory, j):
     if os.path.exists(avg_file_path):
         latex_content += f"\\begin{{figure}}[H]\n\\centering\n"
         latex_content += f"\\includegraphics[width=\\textwidth]{{{avg_file_path}}}\n"
+        latex_content += "\\caption{Chi squared value vs Residual Mass}\n" 
+        # latex_content += f"\\label{{label_kai}}\n"
         latex_content += "\\end{figure}\n"
     else:
         latex_content += "No Chi Squared vs Mass Plot was emitted."
@@ -170,7 +127,8 @@ def end_latex_document(output_directory):
 
 def add_table_to_latex_document(gnuplot_output_directory, chi2_values_list):
     section_title = "Chi-Squared Values Table"
-    latex_content = f"\\section{{{section_title}}}\n"
+    latex_content = ""
+    # latex_content = f"\\section{{{section_title}}}\n"
 
     # Begin the table
     latex_content += f"\\begin{{table}}[H]\n\\centering\n"
@@ -205,7 +163,7 @@ def add_table_to_latex_document(gnuplot_output_directory, chi2_values_list):
 def add_ratio_to_latex_document(gnuplot_output_directory, column_idx):
     """Add ratio plot to the LaTeX document."""
     section_title = f"Ratio of Input {column_idx} to Input 2 vs Residual Mass"
-    latex_content = f"\\section{{{section_title}}}\n"
+    # latex_content = f"\\section{{{section_title}}}\n"
 
     plot_dir = os.path.join(gnuplot_output_directory)
     ratio_file_path = os.path.join(plot_dir, f"ratio_vs_mass_col{column_idx}.png")
@@ -213,6 +171,7 @@ def add_ratio_to_latex_document(gnuplot_output_directory, column_idx):
     if os.path.exists(ratio_file_path):
         latex_content += f"\\begin{{figure}}[H]\n\\centering\n"
         latex_content += f"\\includegraphics[width=\\textwidth]{{{ratio_file_path}}}\n"
+        latex_content += f"\\caption{{section_title}}\n" 
         latex_content += "\\end{figure}\n"
     else:
         latex_content += "No Ratio Plot was emitted."
@@ -221,3 +180,67 @@ def add_ratio_to_latex_document(gnuplot_output_directory, column_idx):
         os.path.join(gnuplot_output_directory, LATEX_DOCUMENT_FILENAME), "a"
     ) as f:
         f.write(latex_content)
+
+
+
+# def add_to_latex_document(
+#     output_directory, gnuplot_each_output_directory, projectile, mass, element
+# ):
+
+#     latex_content = ""
+#     figure_caption = "$^{" + mass + "}$" + element + "(" + projectile + "X)"
+#     # latex_content = f"\\section{{{section_title}}}\n"
+
+#     # First subsection: Cross Section Plot
+#     # latex_content += "\\subsection{Cross Section Plot}\n"
+#     plot_dir = os.path.join(gnuplot_each_output_directory)
+#     plot_files1 = [
+#         file_name
+#         for file_name in os.listdir(plot_dir)
+#         if file_name.startswith("combined_cross_section_plot_")
+#         and file_name.endswith(".png")
+#     ]
+
+#     sorted_plot_files1 = sorted(
+#         plot_files1,
+#         key=lambda x: int(os.path.basename(x).split("_")[-1].split(".")[0]),
+#         reverse=True,
+#     )
+
+#     plot_files2 = [
+#         file_name
+#         for file_name in os.listdir(plot_dir)
+#         if file_name.startswith("chi_squared_vs_input_") and file_name.endswith(".png")
+#     ]
+
+#     sorted_plot_files2 = sorted(
+#         plot_files2,
+#         key=lambda x: int(os.path.basename(x).split("_")[-1].split(".")[0]),
+#         reverse=True,
+#     )
+
+#     for file_name in sorted_plot_files1:
+#         file_path = os.path.join(plot_dir, file_name)
+#         latex_content += f"\\begin{{figure}}[H]\n\\centering\n"
+#         latex_content += f"\\includegraphics[width=\\textwidth]{{{file_path}}}\n"
+#         latex_content += f"\\caption{{figure_caption}}\\label{{}}"
+#         latex_content += "\\end{figure}\n"
+
+#     # Second subsection: Chi Squared Calculation for Each Product
+#     latex_content += "\\subsection{Chi Squared Calculation for Each Product}\n"
+#     for file_name in sorted_plot_files2:
+#         file_path = os.path.join(plot_dir, file_name)
+#         latex_content += f"\\begin{{figure}}[H]\n\\centering\n"
+#         latex_content += f"\\includegraphics[width=\\textwidth]{{{file_path}}}\n"
+#         latex_content += "\\end{figure}\n"
+
+#     # Last subsection: Averaged Chi Squared Calculation
+#     latex_content += "\\subsection{Averaged Chi Squared Calculation}\n"
+#     avg_file_path = os.path.join(plot_dir, "chi_squared_average_vs_input.png")
+#     if os.path.exists(avg_file_path):
+#         latex_content += f"\\begin{{figure}}[H]\n\\centering\n"
+#         latex_content += f"\\includegraphics[width=\\textwidth]{{{avg_file_path}}}\n"
+#         latex_content += "\\end{figure}\n"
+
+#     with open(os.path.join(output_directory, LATEX_DOCUMENT_FILENAME), "a") as f:
+#         f.write(latex_content)

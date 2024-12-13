@@ -47,7 +47,7 @@ from script.chi_squared import (
 )
 from script.latex import (
     generate_latex_document,
-    add_to_latex_document1,
+    add_to_latex_document,
     end_latex_document,
     add_totalchi_to_latex_document,
     add_masschi_to_latex_document,
@@ -269,7 +269,7 @@ def process(
     )
     run_gnuplot(gnuplot_script, gnuplot_script_file)
 
-    add_to_latex_document1(
+    add_to_latex_document(
         gnuplot_output_directory,
         gnuplot_each_output_directory,
         projectile,
